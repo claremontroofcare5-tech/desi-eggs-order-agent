@@ -1,0 +1,257 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Desi Eggs | Order Assistant</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;font-family:Arial,sans-serif;
+ background:#eef3e9;color:#263526;
+ min-height:100vh;display:flex;align-items:center;
+ justify-content:center;padding:18px
+}
+.app{
+ width:100%;max-width:480px;height: min(780px,94vh);
+ background:#fff;border-radius:22px;overflow:hidden;
+ box-shadow:0 15px 55px #243b241c;
+ display:flex;flex-direction:column
+}
+header{
+ background:#244d32;color:white;padding:22px;
+ display:flex;align-items:center;gap:13px
+}
+.logo{
+ width:48px;height:48px;border-radius:15px;
+ background:#d9efbd;display:grid;place-items:center;
+ font-size:27px
+}
+header h2{margin:0;font-size:19px}
+header p{margin:5px 0 0;color:#d5e6d3;font-size:12px}
+.status{margin-left:auto;font-size:11px;color:#d5e6d3}
+.status:before{content:"●";color:#9ee477;margin-right:5px}
+.info{
+ background:#f2f7ed;padding:11px 16px;
+ font-size:12px;color:#496449;text-align:center
+}
+#chat{
+ flex:1;overflow-y:auto;padding:19px 15px;
+ display:flex;flex-direction:column;gap:13px;
+ background:#fbfcf9
+}
+.msg{
+ max-width:85%;padding:12px 14px;border-radius:15px;
+ font-size:14px;line-height:1.5;white-space:pre-wrap
+}
+.bot{background:#edf3e8;align-self:flex-start;border-bottom-left-radius:4px}
+.user{background:#285b39;color:white;align-self:flex-end;border-bottom-right-radius:4px}
+.options{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.options button{
+ border:1px solid #a8c29e;background:white;
+ color:#285b39;border-radius:20px;padding:10px 14px;
+ cursor:pointer;font-size:13px
+}
+.options button:hover{background:#e9f3e3}
+.entry{
+ display:flex;gap:8px;padding:13px;
+ border-top:1px solid #edf0e9;background:white
+}
+input{
+ flex:1;min-width:0;border:1px solid #d9e1d5;
+ border-radius:12px;padding:13px;font-size:14px;outline:none
+}
+input:focus{border-color:#538b57}
+#send{
+ border:0;background:#285b39;color:white;
+ border-radius:12px;padding:0 19px;cursor:pointer
+}
+#send:disabled{opacity:.4;cursor:not-allowed}
+footer{text-align:center;font-size:11px;color:#879384;padding:9px}
+</style>
+</head>
+<body>
+<div class="app">
+ <header>
+  <div class="logo">🥚</div>
+  <div>
+   <h2>Desi Eggs Assistant</h2>
+   <p>Fresh Desi Eggs · Bahawalpur</p>
+  </div>
+  <div class="status">Online</div>
+ </header>
+
+ <div class="info">🥚 Fresh Desi Eggs · Rs. 400 per dozen · Free delivery in Bahawalpur</div>
+
+ <main id="chat"></main>
+
+ <div class="entry">
+  <input id="answer" placeholder="Type your answer..." autocomplete="off">
+  <button id="send" onclick="submitAnswer()">Send ➤</button>
+ </div>
+ <footer>Powered by Desi Eggs</footer>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("answer");
+const send = document.getElementById("send");
+
+const order = {};
+let step = "start";
+
+function message(text, who="bot"){
+ const div=document.createElement("div");
+ div.className="msg "+who;
+ div.textContent=text;
+ chat.appendChild(div);
+ chat.scrollTop=chat.scrollHeight;
+}
+
+function choices(items){
+ const box=document.createElement("div");
+ box.className="options";
+ items.forEach(item=>{
+  const btn=document.createElement("button");
+  btn.textContent=item.label;
+  btn.onclick=()=>item.action();
+  box.appendChild(btn);
+ });
+ chat.appendChild(box);
+ chat.scrollTop=chat.scrollHeight;
+}
+
+function ask(text,next){
+ message(text);
+ step=next;
+ input.value="";
+ input.disabled=false;
+ send.disabled=false;
+ input.focus();
+}
+
+function submitAnswer(){
+ const value=input.value.trim();
+ if(!value)return;
+ message(value,"user");
+ input.value="";
+
+ if(step==="name"){
+  order.name=value;
+  ask("Aapka WhatsApp number kya hai?","phone");
+ }
+ else if(step==="phone"){
+  const phone=value.replace(/[\s-]/g,"");
+  if(!/^\+?[0-9]{10,15}$/.test(phone)){
+   ask("Please valid WhatsApp number enter karein.","phone");
+   return;
+  }
+  order.phone=value;
+  ask("Kitne dozen eggs chahiye? (Minimum 1, maximum 2 dozen)","quantity");
+ }
+ else if(step==="quantity"){
+  const qty=Number(value);
+  if(!Number.isInteger(qty)||qty<1){
+   ask("Please 1 ya 2 dozen enter karein.","quantity");
+   return;
+  }
+  if(qty>2){
+   message("2 dozen se zyada order ke liye please humein WhatsApp ya call karein: 03206762272");
+   finish();
+   return;
+  }
+  order.quantity=qty;
+  ask("Delivery ka complete address aur location share karein. Bahawalpur ke andar delivery free hai.","address");
+ }
+ else if(step==="address"){
+  order.address=value;
+  ask("Payment kaise karna pasand karein ge?","payment");
+  choices([
+   {label:"Cash on Delivery",action:()=>choosePayment("Cash on Delivery")},
+   {label:"Easypaisa",action:()=>choosePayment("Easypaisa")},
+   {label:"SadaPay",action:()=>choosePayment("SadaPay")}
+  ]);
+ }
+}
+
+function choosePayment(method){
+ order.payment=method;
+ message(method,"user");
+ showSummary();
+}
+
+function showSummary(){
+ step="confirm";
+ const total=order.quantity*400;
+ message(
+  "Please apna order check karein:\n\n"+
+  "Name: "+order.name+"\n"+
+  "WhatsApp: "+order.phone+"\n"+
+  "Quantity: "+order.quantity+" dozen\n"+
+  "Price: Rs. "+total+"\n"+
+  "Delivery: Free\n"+
+  "Address: "+order.address+"\n"+
+  "Payment: "+order.payment+
+  "\n\nKya aap order confirm karna chahte hain?"
+ );
+ choices([
+  {label:"✅ Confirm Order",action:confirmOrder},
+  {label:"❌ Cancel",action:cancelOrder}
+ ]);
+}
+
+function confirmOrder(){
+ message("Yes, confirm my order","user");
+ message("Thank you! 🥚 Aapki order details receive karne ke liye ready hain. Hamari team WhatsApp par delivery date confirm karegi.");
+ message("Note: Abhi chatbot ka Google Sheets connection setup hona baqi hai. Isliye ye test version order save nahi karta.");
+ finish();
+}
+
+function cancelOrder(){
+ message("Cancel order","user");
+ message("Koi baat nahi! Jab bhi fresh desi eggs chahiye hon, dobara message karein.");
+ finish();
+}
+
+function finish(){
+ step="done";
+ input.disabled=true;
+ send.disabled=true;
+ choices([{label:"🔄 New Conversation",action:()=>{
+  Object.keys(order).forEach(k=>delete order[k]);
+  chat.innerHTML="";
+  input.disabled=false;send.disabled=false;
+  start();
+ }}]);
+}
+
+function start(){
+ message("Assalam-o-Alaikum! 👋 Desi Eggs mein khush aamdeed.\n\nHum fresh desi eggs Rs. 400 per dozen mein provide karte hain. Bahawalpur mein delivery free hai.");
+ choices([
+  {label:"🥚 Place an Order",action:()=>{
+   message("Place an Order","user");
+   ask("Aapka naam kya hai?","name");
+  }},
+  {label:"ℹ️ Price & Delivery",action:()=>{
+   message("Price & Delivery","user");
+   message("Desi eggs: Rs. 400 per dozen.\nFree delivery within Bahawalpur.\nMinimum order: 1 dozen.\nMaximum online order: 2 dozen.");
+   choices([{label:"Place an Order",action:()=>{
+    message("Place an Order","user");
+    ask("Aapka naam kya hai?","name");
+   }}]);
+  }},
+  {label:"📞 Contact Us",action:()=>{
+   message("Contact Us","user");
+   message("Call or WhatsApp: 03206762272");
+  }}
+ ]);
+}
+
+input.addEventListener("keydown",e=>{
+ if(e.key==="Enter")submitAnswer();
+});
+start();
+</script>
+</body>
+</html>

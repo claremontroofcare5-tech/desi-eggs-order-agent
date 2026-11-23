@@ -201,11 +201,42 @@ function showSummary(){
  ]);
 }
 
-function confirmOrder(){
- message("Yes, confirm my order","user");
- message("Thank you! 🥚 Aapki order details receive karne ke liye ready hain. Hamari team WhatsApp par delivery date confirm karegi.");
- message("Note: Abhi chatbot ka Google Sheets connection setup hona baqi hai. Isliye ye test version order save nahi karta.");
- finish();
+
+async function confirmOrder(){
+  message("Yes, confirm my order","user");
+
+  message("⏳ Aapka order save ho raha hai...");
+
+  try {
+    const response = await fetch("/api/order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(order)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "Order save nahi hua");
+    }
+
+    message(
+      "✅ Order successfully confirm ho gaya!\n\n" +
+      "Order ID: " + result.orderId +
+      "\nTotal: Rs. " + (order.quantity * 400) +
+      "\n\nHamari team WhatsApp par delivery date confirm karegi.\nShukriya! 🥚"
+    );
+
+  } catch (error) {
+    message(
+      "❌ Order save nahi ho saka.\nPlease dobara try karein ya WhatsApp karein: 03206762272"
+    );
+    return;
+  }
+
+  finish();
 }
 
 function cancelOrder(){

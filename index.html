@@ -199,6 +199,7 @@ const send = document.getElementById("send");
 
 const order = {};
 let step = "start";
+let currentPrompt = "";
 
 function message(text, who="bot"){
  const div=document.createElement("div");
@@ -223,6 +224,7 @@ function choices(items){
 
 function ask(text,next){
  message(text);
+ currentPrompt=text;
  step=next;
  input.value="";
  input.disabled=false;
@@ -236,7 +238,16 @@ function submitAnswer(){
  message(value,"user");
  input.value="";
 
- if(step==="name"){
+ // Catch question-like messages even while the bot is collecting order details.
+ if (isLikelyQuestion(value) && step !== "question") {
+  saveCustomerQuestion(value);
+  return;
+ }
+
+ if(step==="question"){
+  saveCustomerQuestion(value, true);
+ }
+ else if(step==="name"){
   order.name=value;
   ask("Aapka WhatsApp number kya hai?","phone");
  }
@@ -271,6 +282,41 @@ function submitAnswer(){
    {label:"Easypaisa",action:()=>choosePayment("Easypaisa")},
    {label:"SadaPay",action:()=>choosePayment("SadaPay")}
   ]);
+ }
+}
+
+function isLikelyQuestion(text){
+ const s = text.toLowerCase();
+ return /[?؟]/.test(s) ||
+  /\b(what|when|where|why|how|which|can|do you|is it|are you|deliver|delivery|available|price|cost|charge|timing|time|open|closed|broken|refund|return|kab|kahan|kidhar|kyun|kaise|kaisay|kitna|kitne|kitni|kya|mil|milega|pohnch|pohanch|charges|rate)\b/.test(s);
+}
+
+async function saveCustomerQuestion(question, fromQuestionStep=false){
+ try {
+  const response = await fetch("/api/order", {
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    type:"question",
+    question,
+    name:order.name || "",
+    phone:order.phone || ""
+   })
+  });
+  const result = await response.json();
+  if(!response.ok || !result.success) throw new Error(result.error || "Save failed");
+
+  message("Shukriya! Aapka sawal hamari team ko bhej diya gaya hai. Hum jawab confirm karke aapko batayenge. 😊");
+ } catch(error) {
+  message("Maazrat! Aapka sawal save nahi ho saka. Please humein WhatsApp karein: 03206762272");
+ }
+
+ if(fromQuestionStep){
+  finish();
+ } else if(step === "confirm"){
+  message("Please apna order summary check karein aur Confirm Order ya Cancel select karein.");
+ } else if(currentPrompt && step !== "done"){
+  message(currentPrompt);
  }
 }
 
@@ -358,6 +404,10 @@ function start(){
     message("Place an Order","user");
     ask("Aapka naam kya hai?","name");
    }}]);
+  }},
+  {label:"❓ Ask a Question",action:()=>{
+   message("Ask a Question","user");
+   ask("Apna sawal likhein. Hamari team jawab confirm karke aapko batayegi.","question");
   }},
   {label:"📞 Contact Us",action:()=>{
    message("Contact Us","user");

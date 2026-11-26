@@ -141,7 +141,7 @@ footer{text-align:center;font-size:10px;color:#64786b;padding:0 12px 13px}
       <div class="avatar" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M16 3.5C10.4 3.5 5.7 13.2 5.7 20.1a10.3 10.3 0 0 0 20.6 0C26.3 13.2 21.6 3.5 16 3.5Z" fill="#16c784" stroke="#a7ffd0" stroke-width="1.2"/><path d="M10.5 19.5c.8-5.3 3.1-9.3 5.8-11.3" stroke="#073b26" stroke-width="2" stroke-linecap="round"/></svg></div>
       <div class="header-copy">
         <h2>Desi Sahet Store</h2>
-        <p>AI Shopping Assistant · Bahawalpur</p>
+        <p>Order Assistant · Bahawalpur</p>
       </div>
       <div class="online">Online</div>
     </header>
@@ -153,7 +153,7 @@ footer{text-align:center;font-size:10px;color:#64786b;padding:0 12px 13px}
       <input id="answer" placeholder="Type your answer..." autocomplete="off" maxlength="1000" aria-label="Type your message">
       <button id="send" onclick="submitAnswer()">Send&nbsp; ➤</button>
     </div>
-    <footer>© Desi Sahet Store · Thank you for choosing fresh</footer>
+    <footer>© Desi Sahet Store · Thank you for your order</footer>
   </section>
 </div>
 
@@ -165,116 +165,91 @@ const send = document.getElementById("send");
 const order = {};
 let step = "start";
 let currentPrompt = "";
-let aiPending = false;
 let orderSaving = false;
-const aiHistory = [];
-const AI_FALLBACK = "Is sawal ka jawab confirm karne ke liye please humein WhatsApp par contact karein: 03206762272";
+const SUPPORT_NUMBER = "03206762272";
+const FALLBACK = `Is sawal ka jawab confirm karne ke liye please humein WhatsApp par contact karein: ${SUPPORT_NUMBER}`;
 
 function message(text, who="bot"){
- const div=document.createElement("div");
- div.className="msg "+who;
- div.textContent=text;
- chat.appendChild(div);
- chat.scrollTop=chat.scrollHeight;
+  const div=document.createElement("div");
+  div.className="msg "+who;
+  div.textContent=text;
+  chat.appendChild(div);
+  chat.scrollTop=chat.scrollHeight;
+  return div;
 }
 
 function choices(items){
- const box=document.createElement("div");
- box.className="options";
- items.forEach(item=>{
-  const btn=document.createElement("button");
-  btn.textContent=item.label;
-  btn.onclick=()=>item.action();
-  box.appendChild(btn);
- });
- chat.appendChild(box);
- requestAnimationFrame(()=>{chat.scrollTop=chat.scrollHeight;});
+  const box=document.createElement("div");
+  box.className="options";
+  items.forEach(item=>{
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.textContent=item.label;
+    btn.onclick=()=>item.action();
+    box.appendChild(btn);
+  });
+  chat.appendChild(box);
+  requestAnimationFrame(()=>{chat.scrollTop=chat.scrollHeight;});
+  return box;
 }
 
 function ask(text,next){
- message(text);
- currentPrompt=text;
- step=next;
- input.value="";
- input.disabled=false;
- send.disabled=false;
- input.focus();
-}
-
-function submitAnswer(){
-  if(aiPending)return;
-  const value=input.value.trim();
-  if(!value)return;
-  if(value.length>1000){
-    message("Please apna message 1000 characters se chhota rakhein.");
-    return;
-  }
-  message(value,"user");
+  message(text);
+  currentPrompt=text;
+  step=next;
   input.value="";
-
-  // Question mode and free-form chat use Gemini. Order fields remain structured below.
-  if(step==="question"){
-    void saveCustomerQuestion(value);
-    askGemini(value,true);
-    return;
-  }
-  if(step==="start"){
-    if(isLikelyQuestion(value))void saveCustomerQuestion(value);
-    askGemini(value,false);
-    return;
-  }
-  // Allow customers to ask a question without losing their current order step.
-  if(isLikelyQuestion(value)){
-    void saveCustomerQuestion(value);
-    askGemini(value,false);
-    return;
-  }
-
-  if(step==="name"){
-    order.name=value;
-    ask("Aapka WhatsApp number kya hai?","phone");
-  }
-  else if(step==="phone"){
-    const phone=value.replace(/[\s-]/g,"");
-    if(!/^\+?[0-9]{10,15}$/.test(phone)){
-      ask("Please valid WhatsApp number enter karein.","phone");
-      return;
-    }
-    order.phone=value;
-    ask("Kitne dozen eggs chahiye? (Minimum 1, maximum 2 dozen)","quantity");
-  }
-  else if(step==="quantity"){
-    const qty=Number(value);
-    if(!Number.isInteger(qty)||qty<1){
-      ask("Please 1 ya 2 dozen enter karein.","quantity");
-      return;
-    }
-    if(qty>2){
-      message("2 dozen se zyada order ke liye please humein WhatsApp ya call karein: 03206762272");
-      finish();
-      return;
-    }
-    order.quantity=qty;
-    ask("Aapka town aur qareebi famous road ka naam kya hai?\nExample: Muslim Town, Rafi Qamar Road","address");
-  }
-  else if(step==="address"){
-    order.address=value;
-    ask("Payment kaise karna pasand karein ge?","payment");
-    choices([
-      {label:"Cash on Delivery",action:()=>choosePayment("Cash on Delivery")},
-      {label:"Easypaisa",action:()=>choosePayment("Easypaisa")},
-      {label:"SadaPay",action:()=>choosePayment("SadaPay")}
-    ]);
-  }
+  input.disabled=false;
+  send.disabled=false;
+  input.focus();
 }
-function isLikelyQuestion(text){
- const s = text.toLowerCase();
- return /[?؟]/.test(s) ||
-  /\b(what|when|where|why|how|which|can|do you|is it|are you|deliver|delivery|available|price|cost|charge|timing|time|open|closed|broken|refund|return|kab|kahan|kidhar|kyun|kaise|kaisay|kitna|kitne|kitni|kya|mil|milega|pohnch|pohanch|charges|rate)\b/.test(s);
+
+function showMainOptions(){
+  choices([
+    {label:"🥚 Place an Order",action:()=>{
+      message("Place an Order","user");
+      ask("Aapka naam kya hai?","name");
+    }},
+    {label:"ℹ️ Price & Delivery",action:()=>{
+      message("Price & Delivery","user");
+      message("Desi eggs: Rs. 400 per dozen.\nFree delivery within Bahawalpur only.\nMinimum order: 1 dozen.\nMaximum online order: 2 dozen.\nDelivery date/time confirm karne ke liye WhatsApp karein: "+SUPPORT_NUMBER);
+      showMainOptions();
+    }},
+    {label:"❓ Ask a Question",action:()=>{
+      message("Ask a Question","user");
+      ask("Apna sawal likhein. Agar jawab hamari confirmed information mein nahi hua toh hum aapko WhatsApp par rabta karne ko kahenge.","question");
+    }},
+    {label:"📞 Contact Us",action:()=>{
+      message("Contact Us","user");
+      message("Call or WhatsApp: "+SUPPORT_NUMBER);
+      showMainOptions();
+    }}
+  ]);
+}
+
+function answerBusinessQuestion(text){
+  const s=text.toLowerCase();
+  if(/\b(hi|hello|hey|salam|assalam|aoa)\b/.test(s) || /السلام|سلام/.test(s)){
+    return "Wa Alaikum Assalam! Desi Sahet Store mein khush aamdeed. Aap Rs. 400 per dozen ke hisaab se 1 ya 2 dozen desi eggs order kar sakte hain.";
+  }
+  if(/price|rate|cost|qeemat|keemat|kitne ke|kitna.*(dozen|anday|anday)|400|م`?\s*قیمت|قیمت/.test(s)){
+    return "Desi eggs ki price Rs. 400 per dozen hai. Online minimum order 1 dozen aur maximum 2 dozen hai.";
+  }
+  if(/payment|pay|easypaisa|sadapay|cash on delivery|cod|ادائیگی/.test(s)){
+    return "Payment ke liye Cash on Delivery, Easypaisa aur SadaPay available hain.";
+  }
+  if(/delivery|deliver|pohanch|pohnch|bahawalpur|outside|city|date|time|kab|کب|ڈیلیوری/.test(s)){
+    if(/bahawalpur/.test(s) && !/outside|bahawalpur se bahar|bahawalpur ke ilawa/.test(s)){
+      return "Bahawalpur mein home delivery free hai. Delivery ki exact date/time confirm karne ke liye WhatsApp par rabta karein: "+SUPPORT_NUMBER;
+    }
+    return "Delivery ki exact date/time ya Bahawalpur se bahar delivery confirm karne ke liye please humein WhatsApp par contact karein: "+SUPPORT_NUMBER;
+  }
+  if(/more than 2|2 se zyada|3 dozen|4 dozen|zyada dozen/.test(s)){
+    return "Online maximum order 2 dozen hai. Is se zyada quantity ke liye WhatsApp ya call karein: "+SUPPORT_NUMBER;
+  }
+  return FALLBACK;
 }
 
 async function saveCustomerQuestion(question){
-  // Keep the existing Google Sheets question-logging request and payload unchanged.
   try{
     const response=await fetch("/api/order",{
       method:"POST",
@@ -286,10 +261,8 @@ async function saveCustomerQuestion(question){
         phone:order.phone || ""
       })
     });
-    const result=await response.json();
-    if(!response.ok || result.success!==true){
-      throw new Error("Question logging failed");
-    }
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok || result.success!==true) throw new Error("Question logging failed");
     return true;
   }catch(error){
     console.error("Customer question could not be logged:",error);
@@ -297,135 +270,137 @@ async function saveCustomerQuestion(question){
   }
 }
 
-function showTypingIndicator(){
-  const indicator=document.createElement("div");
-  indicator.className="msg bot typing-indicator";
-  indicator.setAttribute("role","status");
-  indicator.setAttribute("aria-label","AI is thinking");
-  indicator.innerHTML="<span></span><span></span><span></span>";
-  chat.appendChild(indicator);
-  chat.scrollTop=chat.scrollHeight;
-  return indicator;
-}
-
-async function askGemini(userText,fromQuestionStep=false){
-  if(aiPending)return;
-  aiPending=true;
-  const previousStep=step;
-  const promptToRestore=currentPrompt;
-  input.disabled=true;
-  send.disabled=true;
-  document.querySelectorAll(".options button").forEach(button=>button.disabled=true);
-  const typing=showTypingIndicator();
-
-  try{
-    const response=await fetch("/api/chat",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        message:userText,
-        history:aiHistory.slice(-12)
-      })
-    });
-    const result=await response.json().catch(()=>({}));
-    if(!response.ok || typeof result.reply!=="string" || !result.reply.trim()){
-      throw new Error("AI response unavailable");
-    }
-
-    aiHistory.push(
-      {role:"user",content:userText},
-      {role:"assistant",content:result.reply.trim()}
-    );
-    while(aiHistory.length>12)aiHistory.shift();
-    typing.remove();
-    message(result.reply.trim());
-  }catch(error){
-    console.error("AI chat request failed:",error);
-    typing.remove();
-    message(AI_FALLBACK);
-  }
-
-  if(fromQuestionStep){
-    step="start";
-    currentPrompt="";
-  }else if(previousStep==="confirm"){
-    message("Please apna order summary check karein aur Confirm Order ya Cancel select karein.");
-  }else if(promptToRestore && previousStep!=="start" && previousStep!=="done"){
-    message(promptToRestore);
-  }
-
-  aiPending=false;
-  if(step!=="done"){
+function respondToQuestion(value, restorePrompt=false){
+  void saveCustomerQuestion(value);
+  message(answerBusinessQuestion(value));
+  if(restorePrompt && currentPrompt){
+    message(currentPrompt);
     input.disabled=false;
     send.disabled=false;
-    document.querySelectorAll(".options button").forEach(button=>button.disabled=false);
     input.focus();
+  }else if(step==="question"){
+    step="start";
+    currentPrompt="";
+    showMainOptions();
+  }else if(step==="start"){
+    showMainOptions();
   }
 }
+
+function isLikelyQuestion(text){
+  const s=text.toLowerCase();
+  return /[?؟]/.test(s) || /\b(what|when|where|why|how|which|can|do you|is it|are you|deliver|delivery|available|price|cost|charge|timing|time|open|closed|refund|return|kab|kahan|kidhar|kyun|kaise|kaisay|kitna|kitne|kitni|kya|mil|milega|pohnch|pohanch|charges|rate|payment|easypaisa|sadapay|bahawalpur)\b/.test(s);
+}
+
+function submitAnswer(){
+  if(orderSaving)return;
+  const value=input.value.trim();
+  if(!value)return;
+  if(value.length>1000){message("Please apna message 1000 characters se chhota rakhein.");return;}
+  message(value,"user");
+  input.value="";
+
+  if(step==="question"){
+    respondToQuestion(value,false);
+    return;
+  }
+  if(step==="start"){
+    respondToQuestion(value,false);
+    return;
+  }
+  // Let customers ask questions mid-order without losing their current step.
+  if(isLikelyQuestion(value)){
+    respondToQuestion(value,true);
+    return;
+  }
+
+  if(step==="name"){
+    order.name=value;
+    ask("Aapka WhatsApp number kya hai?","phone");
+  }else if(step==="phone"){
+    const phone=value.replace(/[\s-]/g,"");
+    if(!/^\+?[0-9]{10,15}$/.test(phone)){
+      ask("Please valid WhatsApp number enter karein.","phone");
+      return;
+    }
+    order.phone=value;
+    ask("Kitne dozen eggs chahiye? (Minimum 1, maximum 2 dozen)","quantity");
+  }else if(step==="quantity"){
+    const qty=Number(value);
+    if(!Number.isInteger(qty)||qty<1){ask("Please 1 ya 2 dozen enter karein.","quantity");return;}
+    if(qty>2){
+      message("2 dozen se zyada order ke liye please humein WhatsApp ya call karein: "+SUPPORT_NUMBER);
+      finish();
+      return;
+    }
+    order.quantity=qty;
+    ask("Aapka town aur qareebi famous road ka naam kya hai?\nExample: Muslim Town, Rafi Qamar Road","address");
+  }else if(step==="address"){
+    order.address=value;
+    ask("Payment kaise karna pasand karein ge?","payment");
+    choices([
+      {label:"Cash on Delivery",action:()=>choosePayment("Cash on Delivery")},
+      {label:"Easypaisa",action:()=>choosePayment("Easypaisa")},
+      {label:"SadaPay",action:()=>choosePayment("SadaPay")}
+    ]);
+  }
+}
+
 function choosePayment(method){
- order.payment=method;
- message(method,"user");
- showSummary();
+  order.payment=method;
+  message(method,"user");
+  showSummary();
 }
 
 function showSummary(){
- step="confirm";
- const total=order.quantity*400;
- message(
-  "Please apna order check karein:\n\n"+
-  "Name: "+order.name+"\n"+
-  "WhatsApp: "+order.phone+"\n"+
-  "Quantity: "+order.quantity+" dozen\n"+
-  "Price: Rs. "+total+"\n"+
-  "Delivery: Bahawalpur mein free; bahar delivery WhatsApp par confirm karein.\n"+
-  "Address: "+order.address+"\n"+
-  "Payment: "+order.payment+
-  "\n\nKya aap order confirm karna chahte hain?"
- );
- choices([
-  {label:"✅ Confirm Order",action:confirmOrder},
-  {label:"❌ Cancel",action:cancelOrder}
- ]);
+  step="confirm";
+  const total=order.quantity*400;
+  message(
+    "Please apna order check karein:\n\n"+
+    "Name: "+order.name+"\n"+
+    "WhatsApp: "+order.phone+"\n"+
+    "Quantity: "+order.quantity+" dozen\n"+
+    "Price: Rs. "+total+"\n"+
+    "Delivery: Bahawalpur mein free; bahar delivery WhatsApp par confirm karein.\n"+
+    "Town / Road: "+order.address+"\n"+
+    "Payment: "+order.payment+
+    "\n\nKya aap order confirm karna chahte hain?"
+  );
+  choices([
+    {label:"✅ Confirm Order",action:confirmOrder},
+    {label:"❌ Cancel",action:cancelOrder}
+  ]);
 }
 
 async function confirmOrder(){
-  // Prevent accidental duplicate submissions while the server is saving.
   if(orderSaving)return;
   orderSaving=true;
   document.querySelectorAll(".options button").forEach(button=>button.disabled=true);
   input.disabled=true;
   send.disabled=true;
-
   message("Yes, confirm my order","user");
-  const savingMessage=document.createElement("div");
-  savingMessage.className="msg bot";
-  savingMessage.textContent="⏳ Aapka order save ho raha hai...";
-  chat.appendChild(savingMessage);
-  chat.scrollTop=chat.scrollHeight;
-
-  try {
-    const response = await fetch("/api/order", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(order)
+  const savingMessage=message("⏳ Aapka order save ho raha hai...");
+  try{
+    const response=await fetch("/api/order",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(order)
     });
-    const result = await response.json();
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || "Order save nahi hua");
-    }
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok || !result.success)throw new Error(result.error || "Order save nahi hua");
     savingMessage.remove();
     message(
-      "✅ Order successfully confirm ho gaya!\n\n" +
-      "Order ID: " + result.orderId +
-      "\nTotal: Rs. " + (order.quantity * 400) +
+      "✅ Order successfully confirm ho gaya!\n\n"+
+      "Order ID: "+result.orderId+
+      "\nTotal: Rs. "+(order.quantity*400)+
       "\n\nHamari team WhatsApp par delivery date confirm karegi.\nShukriya! 🥚"
     );
     orderSaving=false;
     finish();
-  } catch (error) {
+  }catch(error){
     savingMessage.remove();
     orderSaving=false;
-    message("❌ Order save nahi ho saka.\nPlease dobara try karein ya WhatsApp karein: 03206762272");
+    message("❌ Order save nahi ho saka.\nPlease dobara try karein ya WhatsApp karein: "+SUPPORT_NUMBER);
     document.querySelectorAll(".options button").forEach(button=>button.disabled=false);
     input.disabled=false;
     send.disabled=false;
@@ -434,58 +409,34 @@ async function confirmOrder(){
 }
 
 function cancelOrder(){
- message("Cancel order","user");
- message("Koi baat nahi! Jab bhi fresh desi eggs chahiye hon, dobara message karein.");
- finish();
+  message("Cancel order","user");
+  message("Koi baat nahi! Jab bhi desi eggs chahiye hon, dobara message karein.");
+  finish();
 }
 
 function finish(){
- step="done";
- input.disabled=true;
- send.disabled=true;
- choices([{label:"🔄 New Conversation",action:()=>{
-  Object.keys(order).forEach(k=>delete order[k]);
-  aiHistory.length=0;
-  aiPending=false;
-  orderSaving=false;
-  step="start";
-  currentPrompt="";
-  chat.innerHTML="";
-  input.disabled=false;send.disabled=false;
-  start();
- }}]);
+  step="done";
+  input.disabled=true;
+  send.disabled=true;
+  choices([{label:"🔄 New Conversation",action:()=>{
+    Object.keys(order).forEach(k=>delete order[k]);
+    orderSaving=false;
+    step="start";
+    currentPrompt="";
+    chat.innerHTML="";
+    input.disabled=false;
+    send.disabled=false;
+    start();
+  }}]);
 }
 
 function start(){
- step="start";
- message("Assalam-o-Alaikum! 👋 Desi Sahet Store mein khush aamdeed.\n\nHum fresh desi eggs Rs. 400 per dozen mein provide karte hain. Bahawalpur mein delivery free hai.");
- choices([
-  {label:"🥚 Place an Order",action:()=>{
-   message("Place an Order","user");
-   ask("Aapka naam kya hai?","name");
-  }},
-  {label:"ℹ️ Price & Delivery",action:()=>{
-   message("Price & Delivery","user");
-   message("Desi eggs: Rs. 400 per dozen.\nFree delivery within Bahawalpur.\nMinimum order: 1 dozen.\nMaximum online order: 2 dozen.");
-   choices([{label:"Place an Order",action:()=>{
-    message("Place an Order","user");
-    ask("Aapka naam kya hai?","name");
-   }}]);
-  }},
-  {label:"❓ Ask a Question",action:()=>{
-   message("Ask a Question","user");
-   ask("Apna sawal likhein. Hamari team jawab confirm karke aapko batayegi.","question");
-  }},
-  {label:"📞 Contact Us",action:()=>{
-   message("Contact Us","user");
-   message("Call or WhatsApp: 03206762272");
-  }}
- ]);
+  step="start";
+  message("Assalam-o-Alaikum! 👋 Desi Sahet Store mein khush aamdeed.\n\nGhar par paali hui murgiyon se hasil kiye gaye desi anday Rs. 400 per dozen mein available hain. Bahawalpur mein delivery free hai.\n\nAap neeche diye gaye options se order place kar sakte hain.");
+  showMainOptions();
 }
 
-input.addEventListener("keydown",e=>{
- if(e.key==="Enter")submitAnswer();
-});
+input.addEventListener("keydown",e=>{if(e.key==="Enter")submitAnswer();});
 start();
 </script>
 </body>

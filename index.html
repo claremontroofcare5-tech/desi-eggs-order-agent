@@ -166,6 +166,7 @@ const order = {};
 let step = "start";
 let currentPrompt = "";
 let aiPending = false;
+let orderSaving = false;
 const aiHistory = [];
 const AI_FALLBACK = "Is sawal ka jawab confirm karne ke liye please humein WhatsApp par contact karein: 03206762272";
 
@@ -376,7 +377,7 @@ function showSummary(){
   "WhatsApp: "+order.phone+"\n"+
   "Quantity: "+order.quantity+" dozen\n"+
   "Price: Rs. "+total+"\n"+
-  "Delivery: Free\n"+
+  "Delivery: Bahawalpur mein free; bahar delivery WhatsApp par confirm karein.\n"+
   "Address: "+order.address+"\n"+
   "Payment: "+order.payment+
   "\n\nKya aap order confirm karna chahte hain?"
@@ -388,8 +389,20 @@ function showSummary(){
 }
 
 async function confirmOrder(){
+  // Prevent accidental duplicate submissions while the server is saving.
+  if(orderSaving)return;
+  orderSaving=true;
+  document.querySelectorAll(".options button").forEach(button=>button.disabled=true);
+  input.disabled=true;
+  send.disabled=true;
+
   message("Yes, confirm my order","user");
-  message("⏳ Aapka order save ho raha hai...");
+  const savingMessage=document.createElement("div");
+  savingMessage.className="msg bot";
+  savingMessage.textContent="⏳ Aapka order save ho raha hai...";
+  chat.appendChild(savingMessage);
+  chat.scrollTop=chat.scrollHeight;
+
   try {
     const response = await fetch("/api/order", {
       method: "POST",
@@ -400,17 +413,24 @@ async function confirmOrder(){
     if (!response.ok || !result.success) {
       throw new Error(result.error || "Order save nahi hua");
     }
+    savingMessage.remove();
     message(
       "✅ Order successfully confirm ho gaya!\n\n" +
       "Order ID: " + result.orderId +
       "\nTotal: Rs. " + (order.quantity * 400) +
       "\n\nHamari team WhatsApp par delivery date confirm karegi.\nShukriya! 🥚"
     );
+    orderSaving=false;
+    finish();
   } catch (error) {
+    savingMessage.remove();
+    orderSaving=false;
     message("❌ Order save nahi ho saka.\nPlease dobara try karein ya WhatsApp karein: 03206762272");
-    return;
+    document.querySelectorAll(".options button").forEach(button=>button.disabled=false);
+    input.disabled=false;
+    send.disabled=false;
+    input.focus();
   }
-  finish();
 }
 
 function cancelOrder(){
@@ -427,6 +447,7 @@ function finish(){
   Object.keys(order).forEach(k=>delete order[k]);
   aiHistory.length=0;
   aiPending=false;
+  orderSaving=false;
   step="start";
   currentPrompt="";
   chat.innerHTML="";

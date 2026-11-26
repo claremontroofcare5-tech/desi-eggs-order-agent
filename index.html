@@ -211,7 +211,7 @@ function showMainOptions(){
     }},
     {label:"ℹ️ Price & Delivery",action:()=>{
       message("Price & Delivery","user");
-      message("Desi eggs: Rs. 400 per dozen.\nFree delivery within Bahawalpur only.\nMinimum order: 1 dozen.\nMaximum online order: 2 dozen.\nDelivery date/time confirm karne ke liye WhatsApp karein: "+SUPPORT_NUMBER);
+      message("Desi eggs: Rs. 400 per dozen.\nFree delivery within Bahawalpur only.\nMinimum order: 1 dozen.\nMaximum online order: 2 dozen.\nOrder place karte waqt aapko expected delivery window batayi jayegi.");
       showMainOptions();
     }},
     {label:"❓ Ask a Question",action:()=>{
@@ -246,7 +246,7 @@ function answerBusinessQuestion(text){
   }
 
   if(/outside bahawalpur|bahawalpur se bahar|bahawalpur ke ilawa|other city|another city|doosre shehar|dusre shehar|outside city/.test(s)){
-    return "Filhal hamari home delivery service Bahawalpur tak mehdood hai. Agar aap kisi doosre shehar se order karna chahte hain, toh delivery ki availability confirm karne ke liye hamari team se WhatsApp par rabta karein: "+SUPPORT_NUMBER;
+    return "Filhal hum sirf Bahawalpur mein home delivery provide karte hain. Bahawalpur ke ilawa doosre kisi shehar mein delivery available nahi hai.";
   }
 
   if(/bahawalpur/.test(s) && !/outside|se bahar|ke ilawa|date|time|kab|when/.test(s)){
@@ -254,7 +254,7 @@ function answerBusinessQuestion(text){
   }
 
   if(/delivery|deliver|pohanch|pohnch|date|time|kab|expected time|when.*(deliver|arriv)|ڈیلیوری/.test(s)){
-    return "Order receive hone ke baad hamari team WhatsApp par aapki delivery date aur expected time confirm kar degi. Aap befikr ho kar apna order place kar sakte hain.";
+    return "Order place karte waqt aapko expected delivery window batayi jayegi. Agar aapko yeh date munasib na lage, toh aap apni preferred date ya earlier delivery ki request bhi de sakte hain.";
   }
 
 
@@ -363,6 +363,14 @@ function submitAnswer(){
       {label:"Easypaisa",action:()=>choosePayment("Easypaisa")},
       {label:"SadaPay",action:()=>choosePayment("SadaPay")}
     ]);
+  }else if(step==="deliveryPreference"){
+    if(value.length>80){
+      ask("Please apni preferred date ya 'Jaldi' likh dein.","deliveryPreference");
+      return;
+    }
+    order.deliveryFeedback="Earlier delivery requested";
+    order.preferredDeliveryDate=/jaldi|as soon|earliest|earlier/i.test(value)?"":value;
+    showSummary();
   }
 }
 
@@ -370,31 +378,89 @@ function choosePayment(method){
   order.payment=method;
   message(method,"user");
   message("Aapko advance payment karne ki zaroorat nahi. Payment order receive karne ke baad hi ki jayegi — bilkul befikr rahein!");
+  prepareDeliveryWindow();
   showSummary();
+}
+
+function getPakistanDateParts(){
+  const parts=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Karachi",year:"numeric",month:"2-digit",day:"2-digit"
+  }).formatToParts(new Date());
+  const values={};
+  parts.forEach(part=>{if(part.type!=="literal")values[part.type]=Number(part.value);});
+  return {year:values.year,month:values.month,day:values.day};
+}
+
+function addCalendarDays(dateParts,days){
+  const date=new Date(Date.UTC(dateParts.year,dateParts.month-1,dateParts.day+days));
+  return {year:date.getUTCFullYear(),month:date.getUTCMonth()+1,day:date.getUTCDate()};
+}
+
+function formatDeliveryDate(dateParts){
+  return new Intl.DateTimeFormat("en-GB",{
+    timeZone:"UTC",day:"numeric",month:"long"
+  }).format(new Date(Date.UTC(dateParts.year,dateParts.month-1,dateParts.day)));
+}
+
+function prepareDeliveryWindow(){
+  // Always calculate from the live Pakistan date when this customer places/confirms an order.
+  // Do not use the previous order date or the last date on which any order was received.
+  // Example: if today is 5 December, delivery is estimated as 7–8 December,
+  // even if the previous order was received on 1 December.
+  const today=getPakistanDateParts();
+  const from=addCalendarDays(today,2);
+  const to=addCalendarDays(today,3);
+  order.orderDate=today.year+"-"+String(today.month).padStart(2,"0")+"-"+String(today.day).padStart(2,"0");
+  order.expectedDeliveryFrom=from.year+"-"+String(from.month).padStart(2,"0")+"-"+String(from.day).padStart(2,"0");
+  order.expectedDeliveryTo=to.year+"-"+String(to.month).padStart(2,"0")+"-"+String(to.day).padStart(2,"0");
+  order.expectedDeliveryLabel=formatDeliveryDate(from)+" se "+formatDeliveryDate(to)+" tak";
 }
 
 function showSummary(){
   step="confirm";
   const total=order.quantity*400;
+  const feedbackLine=order.deliveryFeedback
+    ? "\nDelivery Request: "+order.deliveryFeedback+
+      (order.preferredDeliveryDate?"\nPreferred Date: "+order.preferredDeliveryDate:"")
+    : "";
   message(
-    "Please apna order check karein:\n\n"+
+    "Please apne order ki details check karein:\n\n"+
     "Name: "+order.name+"\n"+
     "WhatsApp: "+order.phone+"\n"+
     "Quantity: "+order.quantity+" dozen\n"+
-    "Price: Rs. "+total+"\n"+
-    "Delivery: Bahawalpur mein free; bahar delivery WhatsApp par confirm karein.\n"+
+    "Total Amount: Rs. "+total+"\n"+
     "Town / Road: "+order.address+"\n"+
-    "Payment: "+order.payment+
-    "\n\nKya aap order confirm karna chahte hain?"
+    "Payment: "+order.payment+"\n"+
+    "Expected Delivery: "+order.expectedDeliveryLabel+
+    "\n\nAapka order "+order.expectedDeliveryLabel+" deliver hone ki tawaqqo hai. Agar delivery is se pehle possible hui, toh hum aapko pehle bhi deliver kar sakte hain."+
+    feedbackLine+
+    "\n\nKya aap apna order confirm karna chahte hain?"
   );
-  choices([
-    {label:"✅ Confirm Order",action:confirmOrder},
-    {label:"❌ Cancel",action:cancelOrder}
-  ]);
+  const options=[{label:"✅ Confirm Order",action:confirmOrder}];
+  if(!order.deliveryFeedback){
+    options.push({label:"📅 Date is not suitable",action:requestEarlierDelivery});
+  }
+  options.push({label:"❌ Don't place order",action:cancelOrder});
+  choices(options);
+}
+
+function requestEarlierDelivery(){
+  message("Delivery date is not suitable","user");
+  ask("Aapko kis date tak delivery chahiye? Agar aap bas jaldi delivery chahte hain aur koi specific date nahi hai, toh 'Jaldi' likh dein.","deliveryPreference");
 }
 
 async function confirmOrder(){
   if(orderSaving)return;
+  // Recheck Pakistan's live date at the exact moment the customer confirms.
+  // If midnight passed while the summary was open, show the updated delivery window
+  // and ask the customer to confirm again before saving the order.
+  const previouslyShownOrderDate=order.orderDate;
+  prepareDeliveryWindow();
+  if(previouslyShownOrderDate && previouslyShownOrderDate!==order.orderDate){
+    message("Pakistan ki current date change ho gayi hai, is liye delivery estimate update kar diya gaya hai. Please nayi details check karke dobara confirm karein.");
+    showSummary();
+    return;
+  }
   orderSaving=true;
   document.querySelectorAll(".options button").forEach(button=>button.disabled=true);
   input.disabled=true;
@@ -410,12 +476,7 @@ async function confirmOrder(){
     const result=await response.json().catch(()=>({}));
     if(!response.ok || !result.success)throw new Error(result.error || "Order save nahi hua");
     savingMessage.remove();
-    message(
-      "✅ Order successfully confirm ho gaya!\n\n"+
-      "Order ID: "+result.orderId+
-      "\nTotal: Rs. "+(order.quantity*400)+
-      "\n\nHamari team WhatsApp par delivery date confirm karegi.\nShukriya! 🥚"
-    );
+    message("Shukriya! Aapka order place ho gaya hai.");
     orderSaving=false;
     finish();
   }catch(error){

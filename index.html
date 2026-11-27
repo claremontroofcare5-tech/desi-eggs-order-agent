@@ -368,8 +368,8 @@ function submitAnswer(){
       ask("Please apni preferred date ya 'Jaldi' likh dein.","deliveryPreference");
       return;
     }
-    order.deliveryFeedback="Earlier delivery requested";
-    order.preferredDeliveryDate=/jaldi|as soon|earliest|earlier/i.test(value)?"":value;
+    order.deliveryFeedback="Customer requested a different delivery date";
+    order.preferredDeliveryDate=/jaldi|as soon|earliest|earlier/i.test(value)?"Jaldi":value;
     showSummary();
   }
 }

@@ -35,23 +35,61 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
 
     } catch (error) {
-      return res.status(500).json({ error: "Question saving failed" });
+      return res.status(500).json({
+        error: "Question saving failed"
+      });
     }
   }
 
-  // Existing order system
-  const { name, phone, quantity, address, payment } = body;
+  // Order details and delivery information
+  const {
+    name,
+    phone,
+    quantity,
+    address,
+    payment,
+    orderDate = "",
+    expectedDeliveryFrom = "",
+    expectedDeliveryTo = "",
+    expectedDeliveryLabel = "",
+    deliveryFeedback = "",
+    preferredDeliveryDate = ""
+  } = body;
 
-  if (!name || !phone || !address || !payment ||
-      !Number.isInteger(quantity) || quantity < 1 || quantity > 2) {
-    return res.status(400).json({ error: "Invalid order details" });
+  if (
+    !name ||
+    !phone ||
+    !address ||
+    !payment ||
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > 2
+  ) {
+    return res.status(400).json({
+      error: "Invalid order details"
+    });
   }
+
+  // Forward order and delivery details to Google Sheets
+  const orderPayload = {
+    name,
+    phone,
+    quantity,
+    address,
+    payment,
+    orderDate,
+    expectedDeliveryFrom,
+    expectedDeliveryTo,
+    expectedDeliveryLabel,
+    deliveryFeedback,
+    preferredDeliveryDate
+  };
 
   try {
     const response = await fetch(process.env.GOOGLE_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ name, phone, quantity, address, payment })
+      body: JSON.stringify(orderPayload)
     });
 
     const result = await response.json();
@@ -63,6 +101,8 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
 
   } catch (error) {
-    return res.status(500).json({ error: "Order saving failed" });
+    return res.status(500).json({
+      error: "Order saving failed"
+    });
   }
 }
